@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B 화면 시험 — 가짜 데이터</title>
+<style>
+  body { margin: 0; font-family: system-ui, -apple-system, "Malgun Gothic", sans-serif; background: #f3f5f9; color: #1f2937; }
+  header { background: #0f1f3d; color: #fff; padding: 14px 20px; }
+  header h1 { margin: 0; font-size: 18px; display: inline; }
+  header span { margin-left: 12px; font-size: 13px; opacity: .8; }
+  .notice { margin: 12px 20px 0; padding: 8px 12px; background: #fff7e6; border: 1px solid #f5d08a; border-radius: 6px; font-size: 13px; }
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px 20px 24px; }
+  .card { background: #fff; border: 1px solid #e3e7ef; border-radius: 10px; padding: 14px 16px; min-width: 0; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .card h2 small { font-weight: normal; color: #6b7280; font-size: 12px; }
+  .wide { grid-column: 1 / -1; }
+  .summary { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { background: #fff; border: 1px solid #e3e7ef; border-radius: 999px; padding: 6px 14px; display: flex; gap: 6px; align-items: baseline; }
+  .chip-label { font-size: 13px; color: #4b5563; }
+  .chip-value { font-size: 18px; }
+  .bar-label, .axis { font-size: 12px; fill: #374151; }
+  .bar-value, .point-value { font-size: 11px; fill: #374151; }
+  .bar-row:hover rect { opacity: .8; }
+  .grid { stroke: #e5e7eb; }
+  .legend { display: flex; gap: 12px; font-size: 12px; color: #4b5563; margin-top: 4px; }
+  .legend-item { display: inline-flex; align-items: center; gap: 4px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .list-head { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .search { flex: 1; min-width: 160px; padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; }
+  .btn { padding: 7px 12px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; cursor: pointer; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tab { border: 1px solid #d1d5db; background: #fff; border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+  .tab.active { background: #0f1f3d; color: #fff; border-color: #0f1f3d; }
+  .list-count, .held-count { font-size: 12px; color: #6b7280; margin: 8px 0 4px; }
+  .table-wrap { overflow-x: auto; }
+  .trend-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .trend-table th, .trend-table td { padding: 6px 8px; border-bottom: 1px solid #eef0f4; text-align: left; white-space: nowrap; }
+  .trend-table th { background: #f8fafc; color: #4b5563; font-weight: 600; }
+  .num { text-align: right !important; font-variant-numeric: tabular-nums; }
+  .badge { padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #eef0f4; }
+  .trend-상승 { background: #dbeafe; color: #1d4ed8; }
+  .trend-신규 { background: #dcfce7; color: #15803d; }
+  .trend-하락 { background: #fee2e2; color: #b91c1c; }
+  .held-list { list-style: none; padding: 0; margin: 0; }
+  .held-list li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eef0f4; font-size: 13px; }
+  .empty { color: #6b7280; font-size: 13px; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; padding: 12px 16px; } }
+</style>
+</head>
+<body>
+<header><h1>환자경험평가 연구 동향 분석기</h1><span>B 화면 시험 페이지</span></header>
+<p class="notice">가짜 데이터(demo/fake-results.js)로 B의 화면만 시험하는 페이지입니다. A의 가져오기 · 키워드 추출이 붙으면 index.html에서 진짜 결과로 그립니다.</p>
+<main>
+  <section class="wide summary" id="summary"></section>
+  <section class="card"><h2>상위 키워드 <small>막대를 누르면 추이에 함께 표시</small></h2><div id="top-bar"></div></section>
+  <section class="card"><h2>연도별 추이 <small id="trend-label">전체 건수</small></h2><div id="trend"></div></section>
+  <section class="card wide"><h2>키워드 추세 목록</h2><div id="trend-list"></div></section>
+  <section class="card wide"><h2>판정 보류 <small>건수가 적어 판정하지 않은 키워드 · rules.js 보강 후보</small></h2><div id="held"></div></section>
+</main>
+<script src="../js/charts.js"></script>
+<script src="../js/list.js"></script>
+<script src="fake-results.js"></script>
+<script>
+  const results = window.FAKE_RESULTS;
+  const summary = window.FAKE_SUMMARY;
+  const years = Charts.yearsOf(results, summary);
+  const total = { label: '전체 건수', counts: summary.byYear };
+
+  function showTrend(keyword) {
+    const r = results.find(x => x.keyword === keyword);
+    Charts.renderTrend(document.getElementById('trend'), r ? [total, { label: r.keyword, counts: r.counts }] : [total], years);
+    document.getElementById('trend-label').textContent = r ? `전체 건수 + ${r.keyword}` : '전체 건수';
+  }
+
+  Charts.renderSummary(document.getElementById('summary'), summary);
+  Charts.renderTopBar(document.getElementById('top-bar'), results, { n: 10, summary, onSelect: showTrend });
+  showTrend(null);
+  List.renderTrendSection(document.getElementById('trend-list'), results, summary);
+  List.renderHeld(document.getElementById('held'), results);
+</script>
+</body>
+</html>
