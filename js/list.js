@@ -32,6 +32,14 @@
     return b.total - a.total || a.keyword.localeCompare(b.keyword, 'ko');
   }
 
+  // 표 머리말: 요약에 판정 구간이 있으면 실제 연도로 (예: 이전 2021–2023)
+  function periodLabels(summary) {
+    const p = (summary && summary.previousYears) || [];
+    const r = (summary && summary.recentYears) || [];
+    const span = ys => ys.length ? `${ys[0]}–${ys[ys.length - 1]}` : '';
+    return [p.length ? `이전 ${span(p)}` : '이전 3년', r.length ? `최근 ${span(r)}` : '최근 3년'];
+  }
+
   function filterResults(results, trend, query) {
     const q = (query || '').trim().toLowerCase();
     return results
@@ -40,9 +48,11 @@
       .sort(byTotal);
   }
 
-  // 판정 탭 + 검색 칸 + 표 + 내보내기 버튼을 한 묶음으로 그림
-  function renderTrendSection(container, results, summary) {
+  // 판정 탭 + 검색 칸 + 표 + 내보내기 버튼을 한 묶음으로 그림 · opts.onSelect(keyword): 행을 누르면 호출
+  function renderTrendSection(container, results, summary, opts) {
+    opts = opts || {};
     clear(container);
+    const labels = periodLabels(summary);
     const sources = window.Charts.sourcesOf(results, summary);
     const years = window.Charts.yearsOf(results, summary);
     const state = { trend: '전체', query: '' };
@@ -76,7 +86,7 @@
       const rows = filterResults(results, state.trend, state.query);
       count.textContent = `${rows.length}개 키워드`;
       clear(tableWrap);
-      tableWrap.append(buildTable(rows, sources));
+      tableWrap.append(buildTable(rows, sources, labels, opts.onSelect));
     }
 
     search.addEventListener('input', () => { state.query = search.value; draw(); });
@@ -85,14 +95,14 @@
       download('keyword-trends.csv', toCSV(rows, sources, years), 'text/csv');
     });
     mdBtn.addEventListener('click', () => {
-      download('keyword-trends.md', toMarkdown(results, summary, sources), 'text/markdown');
+      download('keyword-trends.md', toMarkdown(results, summary, sources, labels), 'text/markdown');
     });
     draw();
   }
 
-  function buildTable(rows, sources) {
+  function buildTable(rows, sources, labels, onSelect) {
     const table = el('table', 'trend-table');
-    const head = ['키워드', '합계'].concat(sources, ['이전 3년', '최근 3년', '증가율', '판정']);
+    const head = ['키워드', '합계'].concat(sources, labels, ['증가율', '판정']);
     const thead = el('thead');
     const tr = el('tr');
     head.forEach(h => tr.append(el('th', null, h)));
@@ -109,6 +119,11 @@
     }
     rows.forEach(r => {
       const row = el('tr');
+      if (onSelect) {
+        row.className = 'clickable';
+        row.title = '누르면 추이와 해당 자료를 봅니다';
+        row.addEventListener('click', () => onSelect(r.keyword));
+      }
       row.append(el('td', 'kw', r.keyword), el('td', 'num', String(r.total)));
       sources.forEach(s => row.append(el('td', 'num', String((r.bySource || {})[s] || 0))));
       row.append(
@@ -168,7 +183,8 @@
   }
 
   // 요약 + 판정별 표 · 판정 보류는 맨 끝에 키워드만
-  function toMarkdown(results, summary, sources) {
+  function toMarkdown(results, summary, sources, labels) {
+    labels = labels || periodLabels(summary);
     const out = ['# 환자경험평가 연구 키워드 동향', ''];
     const parts = [`총 ${summary.total}건`].concat(Object.entries(summary.bySource || {}).map(([k, v]) => `${k} ${v}건`));
     out.push(`- ${parts.join(' · ')}`);
@@ -178,7 +194,7 @@
     trendsOf(results).filter(t => t !== HELD).forEach(t => {
       const rows = results.filter(r => r.trend === t).sort(byTotal);
       out.push(`## ${t} (${rows.length})`, '');
-      const head = ['키워드', '합계'].concat(sources, ['이전 3년', '최근 3년', '증가율']);
+      const head = ['키워드', '합계'].concat(sources, labels, ['증가율']);
       out.push('| ' + head.join(' | ') + ' |', '|' + head.map(() => '---').join('|') + '|');
       rows.forEach(r => {
         const cells = [r.keyword, r.total].concat(sources.map(s => (r.bySource || {})[s] || 0), [r.previous, r.recent, pct(r.growth)]);
@@ -207,5 +223,42 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
 
-  window.List = { renderTrendSection, renderHeld, toCSV, toMarkdown, pct };
+  // 키워드가 붙은 자료 목록 · records는 import.js가 읽은 자료(cleanKeywords 포함)
+  function renderRecords(container, records, keyword, opts) {
+    opts = opts || {};
+    clear(container);
+    const key = (keyword || '').toLowerCase();
+    const rows = records
+      .filter(r => !key || (r.cleanKeywords || []).some(k => k.toLowerCase() === key))
+      .sort((a, b) => b.year - a.year || a.line - b.line);
+    container.append(el('p', 'list-count', keyword ? `'${keyword}' 자료 ${rows.length}건` : `전체 자료 ${rows.length}건`));
+    const table = el('table', 'trend-table records');
+    const tr = el('tr');
+    ['연도', opts.groupLabel || '분야', '제목', '키워드'].forEach(h => tr.append(el('th', null, h)));
+    const thead = el('thead');
+    thead.append(tr);
+    table.append(thead);
+    const tbody = el('tbody');
+    rows.forEach(r => {
+      const row = el('tr');
+      row.append(el('td', 'num', String(r.year)), el('td', null, r[opts.groupColumn] || ''));
+      const titleTd = el('td', 'title');
+      const url = r[opts.linkColumn];
+      if (url && /^https?:\/\//.test(url)) {
+        const a = el('a', null, r.title);
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        titleTd.append(a);
+      } else titleTd.textContent = r.title;
+      row.append(titleTd, el('td', 'kws', (r.cleanKeywords || []).join(' · ')));
+      tbody.append(row);
+    });
+    table.append(tbody);
+    const wrap = el('div', 'table-wrap');
+    wrap.append(table);
+    container.append(wrap);
+  }
+
+  window.List = { renderTrendSection, renderHeld, renderRecords, toCSV, toMarkdown, pct, download };
 })();

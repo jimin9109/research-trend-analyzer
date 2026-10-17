@@ -157,7 +157,12 @@
       svg.append(svgEl('line', { x1: padL, x2: width - padR, y1: yOf(v), y2: yOf(v), class: 'grid' }));
       svg.append(svgEl('text', { x: padL - 6, y: yOf(v) + 4, 'text-anchor': 'end', class: 'axis' }, fmt(v)));
     }
+    // 연도 사이가 좁으면 몇 해씩 건너뛰어 글자가 겹치지 않게 함 (마지막 해는 항상 표시)
+    const gap = years.length > 1 ? plotW / (years.length - 1) : plotW;
+    const every = Math.max(1, Math.ceil(36 / gap));
     years.forEach((y, i) => {
+      if (i % every !== 0 && i !== years.length - 1) return;
+      if (i !== years.length - 1 && years.length - 1 - i < every) return;
       svg.append(svgEl('text', { x: xOf(i), y: height - 10, 'text-anchor': 'middle', class: 'axis' }, y));
     });
 

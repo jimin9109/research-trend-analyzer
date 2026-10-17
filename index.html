@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>환자경험평가 연구 동향 분석기</title>
+<style>
+  :root { --navy: #0f1f3d; --line: #e3e7ef; --muted: #6b7280; --bg: #f3f5f9; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: var(--bg); color: #1f2937; }
+  header { background: var(--navy); color: #fff; padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+  header h1 { margin: 0; font-size: 19px; }
+  header p { margin: 0; font-size: 13px; opacity: .8; }
+  main { display: grid; grid-template-columns: 340px minmax(0, 1fr) minmax(0, 1fr); gap: 14px; padding: 14px 20px 28px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card h2 small { font-weight: normal; color: var(--muted); font-size: 12px; }
+  .span2 { grid-column: span 2; }
+  .span3 { grid-column: 1 / -1; }
+  .stack { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .hint { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+  code { background: #eef2f7; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  textarea { width: 100%; height: 150px; font: 12px/1.45 ui-monospace, Consolas, monospace; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px; resize: vertical; }
+  .buttons { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+  .btn { padding: 7px 12px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .btn.accent { background: #e4572e; border-color: #e4572e; color: #fff; }
+  .status { font-size: 13px; background: #eef4ff; border-radius: 6px; padding: 8px 10px; margin: 0; }
+  .status.error { background: #fdecec; color: #b91c1c; }
+  .status ul { margin: 4px 0 0; padding-left: 18px; }
+  .summary { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; display: flex; gap: 6px; align-items: baseline; }
+  .chip-label { font-size: 13px; color: #4b5563; }
+  .chip-value { font-size: 18px; }
+  .bar-label, .axis { font-size: 12px; fill: #374151; }
+  .bar-value, .point-value { font-size: 11px; fill: #374151; }
+  .bar-row:hover rect { opacity: .8; }
+  .grid { stroke: #e5e7eb; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #4b5563; margin-top: 4px; }
+  .legend-item { display: inline-flex; align-items: center; gap: 4px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  select { padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; max-width: 100%; }
+  .list-head { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .search { flex: 1; min-width: 160px; padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tab { border: 1px solid #d1d5db; background: #fff; border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 13px; }
+  .tab.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .list-count, .held-count { font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+  .table-wrap { overflow-x: auto; max-height: 420px; overflow-y: auto; }
+  .trend-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .trend-table th, .trend-table td { padding: 6px 8px; border-bottom: 1px solid #eef0f4; text-align: left; white-space: nowrap; }
+  .trend-table th { background: #f8fafc; color: #4b5563; font-weight: 600; position: sticky; top: 0; }
+  .trend-table tr.clickable { cursor: pointer; }
+  .trend-table tr.clickable:hover td { background: #f5f8ff; }
+  .records td.title { white-space: normal; min-width: 260px; }
+  .records td.kws { white-space: normal; color: #4b5563; font-size: 12px; min-width: 140px; }
+  .records a { color: #1d4ed8; text-decoration: none; }
+  .records a:hover { text-decoration: underline; }
+  .num { text-align: right !important; font-variant-numeric: tabular-nums; }
+  .badge { padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #eef0f4; }
+  .trend-상승 { background: #dbeafe; color: #1d4ed8; }
+  .trend-신규 { background: #dcfce7; color: #15803d; }
+  .trend-하락 { background: #fee2e2; color: #b91c1c; }
+  .held-list { list-style: none; padding: 0; margin: 0; max-height: 360px; overflow-y: auto; }
+  .held-list li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eef0f4; font-size: 13px; }
+  .rules dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; font-size: 13px; }
+  .rules dt { color: var(--muted); }
+  .rules dd { margin: 0; }
+  .empty { color: var(--muted); font-size: 13px; }
+  .placeholder { color: var(--muted); font-size: 13px; padding: 30px 0; text-align: center; }
+  @media (max-width: 1100px) { main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .input-card { grid-column: 1 / -1; } .span2 { grid-column: 1 / -1; } }
+  @media (max-width: 720px) { main { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; } .span2, .span3 { grid-column: 1; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>환자경험평가 연구 동향 분석기</h1>
+  <p>연구 · 기술 · 정책 자료 목록을 넣으면 기준 파일(rules.js)대로 키워드를 정리해 연도별 흐름을 보여 줍니다</p>
+</header>
+
+<main>
+  <section class="card input-card">
+    <h2>자료 목록 넣기</h2>
+    <p class="hint">CSV 첫 줄에 <code>year,title</code> 필수 · <code>keywords</code>(; 구분) · <code>field</code> · <code>url</code> 선택 · 붙여넣거나 파일을 고르세요</p>
+    <textarea id="input" spellcheck="false" placeholder="year,title,keywords,field&#10;2024,환자경험 측정도구 체계적 문헌고찰,PREM;측정도구,연구"></textarea>
+    <div class="buttons">
+      <button class="btn primary" id="load-sample">예시 불러오기</button>
+      <label class="btn" for="file">파일 선택</label>
+      <input type="file" id="file" accept=".csv,text/csv" hidden>
+      <button class="btn" id="analyze">분석하기</button>
+    </div>
+    <div id="status" class="status">예시 불러오기를 누르거나 자료를 넣고 분석하기를 누르세요.</div>
+  </section>
+
+  <div class="stack">
+    <section class="summary" id="summary"></section>
+    <section class="card">
+      <h2>상위 키워드 <small>막대를 누르면 추이와 자료 목록에 표시</small></h2>
+      <div id="top-bar"><p class="placeholder">분석 결과가 여기에 나옵니다</p></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>연도별 추이 <select id="trend-select" aria-label="추이에 함께 볼 키워드"><option value="">전체 건수만 보기</option></select></h2>
+    <div id="trend"><p class="placeholder">분석 결과가 여기에 나옵니다</p></div>
+    <p class="hint" id="trend-note"></p>
+  </section>
+
+  <section class="card span2">
+    <h2>키워드 추세 목록 <small>행을 누르면 추이와 자료 목록에 표시</small></h2>
+    <div id="trend-list"><p class="placeholder">분석 결과가 여기에 나옵니다</p></div>
+  </section>
+
+  <section class="card">
+    <h2>판정 보류 <small>건수가 적어 판정하지 않은 키워드 · rules.js 보강 후보</small></h2>
+    <div id="held"><p class="placeholder">—</p></div>
+  </section>
+
+  <section class="card span2">
+    <h2><span id="records-title">자료 목록</span>
+      <span class="buttons" style="margin:0">
+        <button class="btn" id="records-all">전체 보기</button>
+        <button class="btn accent" id="export-records">정리된 자료 CSV</button>
+      </span>
+    </h2>
+    <div id="records"><p class="placeholder">—</p></div>
+  </section>
+
+  <section class="card rules">
+    <h2>적용한 기준 <small>rules.js</small></h2>
+    <div id="rules"></div>
+  </section>
+</main>
+
+<script src="rules.js"></script>
+<script src="js/import.js"></script>
+<script src="js/keywords.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/list.js"></script>
+<script>
+  const RULES = window.RULES;
+  const $ = id => document.getElementById(id);
+  const state = { records: [], columns: [], results: [], summary: null, selected: '' };
+
+  function setStatus(html, isError) {
+    const box = $('status');
+    box.className = 'status' + (isError ? ' error' : '');
+    box.textContent = '';
+    if (typeof html === 'string') box.textContent = html; else box.append(html);
+  }
+
+  function analyze() {
+    const read = Importer.read($('input').value, RULES);
+    if (read.error) { setStatus(read.error, true); return; }
+    if (!read.records.length) { setStatus('읽을 수 있는 자료가 없습니다.', true); return; }
+    const { results, summary } = Keywords.analyze(read.records, RULES, read.skipped);
+    Object.assign(state, { records: read.records, columns: read.columns, results, summary, selected: '' });
+
+    const msg = document.createElement('div');
+    msg.append(`${summary.total}건을 읽었습니다. 키워드 ${results.length}개. 건너뛴 줄 ${read.skipped.length ? read.skipped.length + '개' : '없음'}.`);
+    if (read.skipped.length) {
+      const ul = document.createElement('ul');
+      read.skipped.forEach(s => { const li = document.createElement('li'); li.textContent = `${s.line}번째 줄: ${s.reason}`; ul.append(li); });
+      msg.append(ul);
+    }
+    if (summary.fromTitle) msg.append(` 키워드 칸이 빈 ${summary.fromTitle}건은 제목에서 낱말을 뽑았습니다.`);
+    setStatus(msg);
+    renderAll();
+  }
+
+  function renderAll() {
+    const { results, summary } = state;
+    if (!summary) return;
+    Charts.renderSummary($('summary'), summary);
+    Charts.renderTopBar($('top-bar'), results, { n: RULES.topN, summary, onSelect: select });
+    fillSelect();
+    renderTrend();
+    List.renderTrendSection($('trend-list'), results, summary, { onSelect: select });
+    List.renderHeld($('held'), results);
+    renderRecords();
+    renderRules();
+  }
+
+  function fillSelect() {
+    const sel = $('trend-select');
+    while (sel.options.length > 1) sel.remove(1);
+    state.results.slice().sort((a, b) => b.total - a.total || a.keyword.localeCompare(b.keyword, 'ko'))
+      .forEach(r => sel.add(new Option(`${r.keyword} (${r.total})`, r.keyword)));
+    sel.value = state.selected;
+  }
+
+  function renderTrend() {
+    const { results, summary, selected } = state;
+    const years = Charts.yearsOf(results, summary);
+    const series = [{ label: '전체 자료 건수', counts: summary.byYear }];
+    const r = results.find(x => x.keyword === selected);
+    if (r) series.push({ label: r.keyword, counts: r.counts });
+    Charts.renderTrend($('trend'), series, years);
+    $('trend-note').textContent = `판정 구간: 이전 ${summary.previousYears[0]}–${summary.previousYears.at(-1)} · 최근 ${summary.recentYears[0]}–${summary.recentYears.at(-1)}`
+      + (r ? ` · ${r.keyword}: 이전 ${r.previous} → 최근 ${r.recent} (${List.pct(r.growth)}, ${r.trend})` : '');
+  }
+
+  function renderRecords() {
+    $('records-title').textContent = state.selected ? `자료 목록 · ${state.selected}` : '자료 목록';
+    List.renderRecords($('records'), state.records, state.selected, {
+      groupColumn: RULES.columns.group, groupLabel: '분야', linkColumn: RULES.columns.link
+    });
+  }
+
+  function select(keyword) {
+    state.selected = keyword || '';
+    $('trend-select').value = state.selected;
+    renderTrend();
+    renderRecords();
+  }
+
+  function renderRules() {
+    const t = RULES.trend;
+    const items = [
+      ['키워드 출처', `${RULES.columns.keywords} 칸 (비면 제목 낱말)`],
+      ['판정 구간', `마지막 연도 기준 최근 ${t.window}년 vs 이전 ${t.window}년`],
+      ['상승 · 하락', `+${Math.round(t.rise * 100)}% 이상 · ${Math.round(t.fall * 100)}% 이하`],
+      ['판정 보류', `두 구간 합 ${t.minCount}건 미만`],
+      ['신규', '이전 구간 0건'],
+      ['불용어', `${RULES.stopwords.length}개`],
+      ['동의어', `${Object.keys(RULES.synonyms).length}쌍`],
+      ['막대 색', `${RULES.columns.group} 칸`]
+    ];
+    const dl = document.createElement('dl');
+    items.forEach(([k, v]) => {
+      const dt = document.createElement('dt'); dt.textContent = k;
+      const dd = document.createElement('dd'); dd.textContent = v;
+      dl.append(dt, dd);
+    });
+    $('rules').textContent = '';
+    $('rules').append(dl);
+  }
+
+  $('analyze').addEventListener('click', analyze);
+  $('trend-select').addEventListener('change', e => select(e.target.value));
+  $('records-all').addEventListener('click', () => select(''));
+  $('export-records').addEventListener('click', () => {
+    if (!state.records.length) return;
+    List.download('records-cleaned.csv', Importer.toCSV(state.records, state.columns, RULES.columns.keywords), 'text/csv');
+  });
+  $('file').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => { $('input').value = reader.result; analyze(); };
+    reader.readAsText(f, 'utf-8');
+    e.target.value = '';
+  });
+  $('load-sample').addEventListener('click', async () => {
+    try {
+      const res = await fetch('data/sample.csv');
+      if (!res.ok) throw new Error(res.status);
+      $('input').value = await res.text();
+      analyze();
+    } catch (err) {
+      setStatus('예시를 불러오지 못했습니다. 파일을 더블클릭해 열었다면 브라우저가 막은 것입니다 → "파일 선택"으로 data/sample.csv를 고르거나 배포 주소에서 여세요.', true);
+    }
+  });
+
+  // 창 크기가 바뀌면 그래프 폭을 다시 맞춤
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (!state.summary) return;
+      Charts.renderTopBar($('top-bar'), state.results, { n: RULES.topN, summary: state.summary, onSelect: select });
+      renderTrend();
+    }, 150);
+  });
+</script>
+</body>
+</html>
