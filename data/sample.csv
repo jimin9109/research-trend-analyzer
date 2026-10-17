@@ -1,0 +1,19 @@
+﻿id,year,title,keywords,source,field,country,note,url,open
+R1,2024,Patient-Reported Experience Measures in Adult Inpatient Settings: A Systematic Review,PREM;측정도구;체계적문헌고찰;입원환자,논문,연구,중국,성인 입원환자 PREM 도구 23종(29편) 검토,https://doi.org/10.1155/jonm/5166392,공개
+R2,2026,Global scoping review of key domains of patient-reported experience of care measures across life stages and healthcare technical areas,PREM;측정도구;주제범위문헌고찰,논문,연구,국제,생애주기·진료영역별 PREM 핵심 영역 정리와 도구 조화 필요성,https://doi.org/10.1136/bmjopen-2025-103782,공개
+R3,2023,Tools for measuring client experiences and satisfaction with healthcare in low- and middle-income countries: a systematic review of measurement properties,측정도구;환자만족도;체계적문헌고찰,논문,연구,국제,경험·만족도 측정도구의 측정 특성 검토,https://doi.org/10.1186/s12913-023-09129-9,공개
+R4,2025,환자경험 평가 개선과 의료체계의 환자중심성 강화를 위한 과제: 환자 대상 질적 연구 결과,환자경험평가;결과공개;환자중심성;질적연구,논문,연구,한국,심평원 환자경험평가 결과 공개에 대한 환자 FGI·심층면접,https://doi.org/10.15709/hswr.2025.45.3.218,공개
+R5,2023,일 상급종합병원 입원 환자가 인식한 환자중심간호가 환자경험에 미치는 영향,환자중심성;입원환자;간호,논문,연구,한국,입원환자 147명 조사: 환자중심간호와 환자경험의 관계,https://doi.org/10.11111/jkana.2023.29.3.288,초록만 공개
+R6,2015,Instruments to measure patient experience of healthcare quality in hospitals: a systematic review,측정도구;체계적문헌고찰;의료질,논문,연구,영국,필수 자료: 병원 환자경험 측정도구의 심리측정 특성 평가,https://doi.org/10.1186/s13643-015-0089-0,공개
+T1,2022,Analyzing patient experiences using natural language processing: development and validation of the artificial intelligence patient reported experience measure (AI-PREM),PREM;자연어처리;감성분석;토픽모델링,논문,기술,네덜란드,개방형 설문 + NLP + 시각화 도구 개발·검증,https://doi.org/10.1186/s12911-022-01923-5,공개
+T2,2024,It's Difficult to Be Neutral – Human and LLM-based Sentiment Annotation of Patient Comments,대형언어모델;감성분석;자유서술의견,학술대회 논문,기술,노르웨이,환자 설문 자유서술에 LLM 감성 주석 시험 · 사람 주석자에 못 미침,https://aclanthology.org/2024.cl4health-1.2,공개
+T3,2022,토픽 모델링을 활용한 한의원 리뷰 분석과 마케팅 제언,토픽모델링;온라인리뷰;자유서술의견,논문,기술,한국,환자 온라인 리뷰 1만 4천여 건 LDA 토픽모델링,https://doi.org/10.13048/jkm.22007,공개
+T4,2025,Transforming Patient Feedback Into Actionable Insights Through Natural Language Processing: Knowledge Discovery and Action Research Study,자연어처리;자유서술의견;의료질,논문,기술,싱가포르,"피드백 126,134건 NLP 분석 후 개선 조치 실행",https://doi.org/10.2196/69699,공개
+T5,2024,2023년(4차) 환자경험 평가결과,환자경험평가;모바일조사;결과공개,보고서,기술,한국,"전화 조사에서 모바일웹 조사로 처음 전환(374곳, 64,246명)",https://www.hira.or.kr/cms/open/04/04/12/2024_18.pdf,공개
+T6,2024,Near real-time patient experience feedback with data relay to providers: a systematic review of its effectiveness,실시간피드백;체계적문헌고찰;의료질,논문,기술,미국,"실시간 피드백 연구 8편: 대면 수집 후 빠른 전달은 효과, 키오스크는 효과 없음",https://doi.org/10.1093/intqhc/mzae053,확인 필요
+P1,2026,5차 환자경험평가 등급제 첫 도입·공개 및 6차 시행 계획 발표,환자경험평가;모바일조사;결과공개;평가확대,보도자료,정책,한국,5차 13만 435명 응답·첫 등급 공개 · 6차 887개소로 확대,https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020041000100&brdScnBltNo=4&brdBltNo=11870,공개
+P2,2023,환자안전사고 예방을 위한 제2차 환자안전종합계획(2023~2027) 수립,환자안전;환자참여,보도자료,정책,한국,3대 전략 중 국민참여 활성화(환자·보호자 참여 확대),https://www.mohw.go.kr/board.es?mid=a10503010100&bid=0027&act=view&list_no=1479309,공개
+P3,2025,Does Healthcare Deliver? Results from the Patient-Reported Indicator Surveys (PaRIS),PREM;국제비교;1차의료,보고서,정책,국제,19개국 1차의료 이용자 약 10만 7천 명 PREM·PROM 국제조사,https://doi.org/10.1787/c8af05a5-en,공개
+P4,2016,The CAHPS Ambulatory Care Improvement Guide: Practical Strategies for Improving Patient Experience,CAHPS;의료질;개선전략,지침,정책,미국,필수 자료: CAHPS 결과로 개선 전략을 세우는 실무 가이드(2023 재검토),https://www.ahrq.gov/cahps/quality-improvement/improvement-guide/improvement-guide.html,공개
+P5,2021,Global Patient Safety Action Plan 2021–2030,환자안전;환자참여,행동계획,정책,국제,전략목표 4: 환자·가족 참여,https://www.who.int/publications/i/item/9789240032705,공개
+P6,2016,"Framework on integrated, people-centred health services (A69/39)",환자중심성;환자참여,정책 프레임워크,정책,국제,필수 자료: 5대 전략의 첫째가 사람·지역사회의 역량 강화·참여,https://apps.who.int/gb/ebwha/pdf_files/WHA69/A69_39-en.pdf,공개
