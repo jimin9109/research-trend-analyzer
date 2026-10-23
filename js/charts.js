@@ -32,6 +32,14 @@
     return Math.max(300, Math.floor(container.clientWidth) || 560);
   }
 
+  // 12px 글자 폭 재기 (막대 이름 칸 폭 계산용)
+  let measureCtx;
+  function textWidth(s) {
+    measureCtx = measureCtx || document.createElement('canvas').getContext('2d');
+    measureCtx.font = '12px system-ui, "Malgun Gothic", sans-serif';
+    return measureCtx.measureText(s).width;
+  }
+
   function fmt(n) {
     return Number(n || 0).toLocaleString('ko-KR');
   }
@@ -82,7 +90,9 @@
       return;
     }
 
-    const labelW = 120, valueW = 44, rowH = 28, width = widthOf(container);
+    const valueW = 44, rowH = 28, width = widthOf(container);
+    // 이름 칸 폭: 가장 긴 이름에 맞춤 · 그래프 폭의 45%를 넘지 않게
+    const labelW = Math.min(Math.round(width * 0.45), Math.max(120, Math.ceil(Math.max(...top.map(r => textWidth(r.keyword)))) + 16));
     const barMax = width - labelW - valueW;
     const max = Math.max(...top.map(r => r.total));
     const svg = svgEl('svg', {

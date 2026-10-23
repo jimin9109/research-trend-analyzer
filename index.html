@@ -78,6 +78,9 @@
   .dropped { max-height: 260px; overflow-y: auto; margin: 6px 0 0; padding-left: 18px; }
   .dropped li { margin: 3px 0; }
   .dropped small { color: var(--muted); }
+  .unit-toggle { display: inline-flex; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; margin: 0 0 8px; }
+  .unit-toggle button { border: 0; background: #fff; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+  .unit-toggle button.active { background: var(--navy); color: #fff; }
   .empty { color: var(--muted); font-size: 13px; }
   .placeholder { color: var(--muted); font-size: 13px; padding: 30px 0; text-align: center; }
   @media (max-width: 1100px) { main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .input-card { grid-column: 1 / -1; } .span2 { grid-column: 1 / -1; } }
@@ -101,35 +104,39 @@
       <input type="file" id="file" accept=".csv,text/csv" hidden>
       <button class="btn" id="analyze">분석하기</button>
     </div>
+    <div class="unit-toggle" role="group" aria-label="보기 단위">
+      <button id="unit-topic" type="button">주제로 보기</button>
+      <button id="unit-keyword" type="button">키워드로 보기</button>
+    </div>
     <div id="status" class="status">예시 불러오기를 누르거나 자료를 넣고 분석하기를 누르세요.</div>
   </section>
 
   <div class="stack">
     <section class="summary" id="summary"></section>
     <section class="card">
-      <h2>상위 키워드 <small>막대를 누르면 추이와 자료 목록에 표시</small></h2>
+      <h2><span id="top-title">상위 키워드</span> <small>막대를 누르면 추이와 자료 목록에 표시</small></h2>
       <div id="top-bar"><p class="placeholder">분석 결과가 여기에 나옵니다</p></div>
     </section>
   </div>
 
   <section class="card">
-    <h2>연도별 추이 <select id="trend-select" aria-label="추이에 함께 볼 키워드"><option value="">전체 건수만 보기</option></select></h2>
+    <h2>연도별 추이 <select id="trend-select" aria-label="추이에 함께 볼 주제나 키워드"><option value="">전체 건수만 보기</option></select></h2>
     <div id="trend"><p class="placeholder">분석 결과가 여기에 나옵니다</p></div>
     <p class="hint" id="trend-note"></p>
   </section>
 
   <section class="card span2">
-    <h2>키워드 추세 목록 <small>행을 누르면 추이와 자료 목록에 표시</small></h2>
+    <h2><span id="list-title">키워드 추세 목록</span> <small>행을 누르면 추이와 자료 목록에 표시</small></h2>
     <div id="trend-list"><p class="placeholder">분석 결과가 여기에 나옵니다</p></div>
   </section>
 
   <section class="card">
-    <h2>판정 보류 <small>건수가 적어 판정하지 않은 키워드 · rules.js 보강 후보</small></h2>
+    <h2><span id="held-title">판정 보류</span> <small id="held-hint">건수가 적어 판정하지 않은 키워드 · rules.js 보강 후보</small></h2>
     <div id="held"><p class="placeholder">—</p></div>
   </section>
 
   <section class="card span2">
-    <h2>과제 vs 논문 <small>그 키워드가 붙은 비율 차이가 큰 순 · 누르면 추이와 자료 목록에 표시</small></h2>
+    <h2>과제 vs 논문 <small>비율 차이가 큰 순 · 누르면 추이와 자료 목록에 표시</small></h2>
     <div id="gap"><p class="placeholder">—</p></div>
   </section>
 
@@ -163,7 +170,8 @@
 <script>
   const RULES = window.RULES;
   const $ = id => document.getElementById(id);
-  const state = { records: [], columns: [], results: [], summary: null, filtered: null, selected: '' };
+  const state = { records: [], columns: [], results: [], summary: null, filtered: null, read: null, selected: '',
+    unit: RULES.view === 'keyword' || !(RULES.topics || []).length ? 'keyword' : 'topic' };
   document.title = RULES.title;
   $('page-title').textContent = RULES.title;
   $('page-subtitle').textContent = RULES.subtitle || '';
@@ -181,11 +189,22 @@
     if (!read.records.length) { setStatus('읽을 수 있는 자료가 없습니다.', true); return; }
     const filtered = Filter.apply(read.records, RULES);
     if (!filtered.kept.length) { setStatus(`${read.records.length}건을 읽었지만 거르기 규칙에 맞는 자료가 없습니다. rules.js의 filter를 확인하세요.`, true); return; }
-    const { results, summary } = Keywords.analyze(filtered.kept, RULES, read.skipped);
-    Object.assign(state, { records: filtered.kept, columns: read.columns, results, summary, filtered, selected: '' });
+    Object.assign(state, { records: filtered.kept, columns: read.columns, filtered, read, selected: '' });
+    runAnalysis();
+  }
 
+  // 보기 단위(주제 · 키워드)로 다시 셈 · 읽기와 거르기는 그대로
+  function runAnalysis() {
+    const { read, filtered } = state;
+    if (!filtered) { renderUnitToggle(); return; }
+    const { results, summary } = Keywords.analyze(filtered.kept, RULES, read.skipped, state.unit);
+    Object.assign(state, { results, summary, selected: '' });
+
+    const unitWord = summary.unit === 'topic' ? '주제' : '키워드';
     const msg = document.createElement('div');
-    msg.append(`${read.records.length}건을 읽어 ${filtered.kept.length}건을 남기고 ${filtered.dropped.length}건을 뺐습니다. 키워드 ${results.length}개. 건너뛴 줄 ${read.skipped.length ? read.skipped.length + '개' : '없음'}.`);
+    msg.append(`${read.records.length}건을 읽어 ${filtered.kept.length}건을 남기고 ${filtered.dropped.length}건을 뺐습니다. ${unitWord} ${results.length}개`
+      + (summary.unit === 'topic' ? ` (주제가 없는 자료 ${summary.noTopic}건)` : '')
+      + `. 건너뛴 줄 ${read.skipped.length ? read.skipped.length + '개' : '없음'}.`);
     if (read.skipped.length) {
       const ul = document.createElement('ul');
       read.skipped.forEach(s => { const li = document.createElement('li'); li.textContent = `${s.line}번째 줄: ${s.reason}`; ul.append(li); });
@@ -196,15 +215,34 @@
     renderAll();
   }
 
+  function renderUnitToggle() {
+    const hasTopics = (RULES.topics || []).length > 0;
+    $('unit-topic').disabled = !hasTopics;
+    $('unit-topic').className = state.unit === 'topic' ? 'active' : '';
+    $('unit-keyword').className = state.unit === 'keyword' ? 'active' : '';
+  }
+
   function renderAll() {
     const { results, summary } = state;
     if (!summary) return;
+    const unitWord = summary.unit === 'topic' ? '주제' : '키워드';
+    renderUnitToggle();
+    $('top-title').textContent = '상위 ' + unitWord;
+    $('list-title').textContent = unitWord + ' 추세 목록';
     Charts.renderSummary($('summary'), summary);
     Charts.renderTopBar($('top-bar'), results, { n: RULES.topN, summary, onSelect: select });
     fillSelect();
     renderTrend();
     List.renderTrendSection($('trend-list'), results, summary, { onSelect: select });
-    List.renderHeld($('held'), results);
+    if (summary.unit === 'topic') {
+      $('held-title').textContent = '주제 밖 키워드';
+      $('held-hint').textContent = '어느 주제에도 안 들어간 키워드 · rules.js topics 보강 후보';
+      List.renderUnmatched($('held'), summary);
+    } else {
+      $('held-title').textContent = '판정 보류';
+      $('held-hint').textContent = `합계 2~${RULES.trend.minCount - 1}건이라 판정하지 않은 키워드 · 한 번만 나온 키워드는 목록의 '한 번만 나옴' 탭`;
+      List.renderHeld($('held'), results);
+    }
     List.renderGap($('gap'), results, summary, { n: 8, minCount: RULES.trend.minCount, onSelect: select });
     renderFilter();
     renderRecords();
@@ -293,6 +331,8 @@
         + (t.minPointChange ? `, 그리고 차이 ±${t.minPointChange}%p 이상` : '')],
       ['판정 보류', `전체 합계 ${t.minCount}건 미만`],
       ['신규', '이전 구간 0건'],
+      ['한 번만 나옴', t.singleSeparate ? '합계 1건은 판정 보류와 따로 분류' : '판정 보류에 포함'],
+      ['주제 묶음', (RULES.topics || []).length ? `${RULES.topics.length}개 (키워드 안 낱말로 묶음)` : '없음'],
       ['불용어', `${RULES.stopwords.length}개`],
       ['동의어', `${Object.keys(RULES.synonyms).length}쌍`],
       ['띄어쓰기', RULES.ignoreSpaces ? '무시하고 같은 낱말로' : '구분'],
@@ -309,6 +349,9 @@
   }
 
   $('analyze').addEventListener('click', analyze);
+  $('unit-topic').addEventListener('click', () => { state.unit = 'topic'; runAnalysis(); });
+  $('unit-keyword').addEventListener('click', () => { state.unit = 'keyword'; runAnalysis(); });
+  renderUnitToggle();
   $('trend-select').addEventListener('change', e => select(e.target.value));
   $('records-all').addEventListener('click', () => select(''));
   $('export-records').addEventListener('click', () => {

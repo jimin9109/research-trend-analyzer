@@ -2,7 +2,7 @@
 // 받는 데이터 모양은 js/charts.js 맨 위 설명과 같음 · 판정(trend)은 A가 붙인 값을 그대로 씀
 (function () {
   // 탭 순서 · 여기 없는 판정 이름이 오면 뒤에 붙임
-  const TREND_ORDER = ['상승', '신규', '하락', '유지', '판정 보류'];
+  const TREND_ORDER = ['상승', '신규', '하락', '유지', '판정 보류', '한 번만 나옴'];
   const HELD = '판정 보류';
 
   function el(tag, cls, text) {
@@ -49,6 +49,11 @@
     return (summary && summary.years) || window.Charts.yearsOf(results, summary);
   }
 
+  // 표 · 목록에서 부르는 단위 이름
+  function unitName(summary) {
+    return summary && summary.unit === 'topic' ? '주제' : '키워드';
+  }
+
   function byTotal(a, b) {
     return b.total - a.total || a.keyword.localeCompare(b.keyword, 'ko');
   }
@@ -85,7 +90,7 @@
     const head = el('div', 'list-head');
     const search = el('input', 'search');
     search.type = 'search';
-    search.placeholder = '키워드 검색';
+    search.placeholder = unitName(summary) + ' 검색';
     const csvBtn = el('button', 'btn', 'CSV 내보내기');
     const mdBtn = el('button', 'btn', '마크다운 내보내기');
     head.append(search, csvBtn, mdBtn);
@@ -109,7 +114,7 @@
     function draw() {
       drawTabs();
       const rows = filterResults(results, state.trend, state.query);
-      count.textContent = `${rows.length}개 키워드`;
+      count.textContent = `${rows.length}개 ${unitName(summary)}`;
       clear(tableWrap);
       tableWrap.append(buildTable(rows, sources, labels, opts.onSelect, summary));
     }
@@ -129,7 +134,7 @@
     const table = el('table', 'trend-table');
     const years = summary ? tableYears(rows, summary) : [];
     const byYear = (summary && summary.byYear) || {};
-    const head = ['키워드', '합계'].concat(sources, years, labels, ['판정']);
+    const head = [unitName(summary), '합계'].concat(sources, years, labels, ['판정']);
     const thead = el('thead');
     const tr = el('tr');
     head.forEach(h => tr.append(el('th', null, h)));
@@ -265,8 +270,9 @@
     opts = opts || {};
     clear(container);
     const key = (keyword || '').toLowerCase();
+    // 주제로 볼 때는 자료의 주제(units)로, 키워드로 볼 때는 키워드로 고름
     const rows = records
-      .filter(r => !key || (r.cleanKeywords || []).some(k => k.toLowerCase() === key))
+      .filter(r => !key || (r.units || r.cleanKeywords || []).some(k => k.toLowerCase() === key))
       .sort((a, b) => b.year - a.year || a.line - b.line);
     container.append(el('p', 'list-count', keyword ? `'${keyword}' 자료 ${rows.length}건` : `전체 자료 ${rows.length}건`));
     const table = el('table', 'trend-table records');
@@ -335,5 +341,23 @@
     container.append(el('p', 'list-count', `${a} ${summary.bySource[a]}건 · ${b} ${summary.bySource[b]}건 중 그 키워드가 붙은 비율 · 합계 ${opts.minCount || 1}건 이상`), wrap);
   }
 
-  window.List = { renderGap, renderTrendSection, renderHeld, renderRecords, toCSV, toMarkdown, pct, download };
+  // 주제로 볼 때 어느 주제에도 안 들어간 키워드 · rules.js topics 보강 후보
+  function renderUnmatched(container, summary) {
+    clear(container);
+    const list = Object.entries((summary && summary.unmatched) || {}).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ko'));
+    container.append(el('p', 'held-count', `키워드 ${list.length}개 · 주제가 하나도 없는 자료 ${summary.noTopic}건`));
+    if (!list.length) {
+      container.append(el('p', 'empty', '모든 키워드가 주제에 들어갔습니다.'));
+      return;
+    }
+    const ul = el('ul', 'held-list');
+    list.forEach(([k, n]) => {
+      const li = el('li');
+      li.append(el('span', 'kw', k), el('span', 'num', `${n}건`));
+      ul.append(li);
+    });
+    container.append(ul);
+  }
+
+  window.List = { renderUnmatched, renderGap, renderTrendSection, renderHeld, renderRecords, toCSV, toMarkdown, pct, download };
 })();

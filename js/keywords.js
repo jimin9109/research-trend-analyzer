@@ -55,7 +55,9 @@
     const pointChange = prevShare != null && recentShare != null ? (recentShare - prevShare) * 100 : null;
     const bigEnough = sign => !t.minPointChange || (pointChange != null && sign * pointChange >= t.minPointChange);
     let trend;
-    if ((total != null ? total : previous + recent) < t.minCount) trend = '판정 보류';
+    const n = total != null ? total : previous + recent;
+    if (t.singleSeparate && n === 1) trend = '한 번만 나옴';
+    else if (n < t.minCount) trend = '판정 보류';
     else if (previous === 0) trend = '신규';
     else if (growth >= t.rise && bigEnough(1)) trend = '상승';
     else if (growth <= t.fall && bigEnough(-1)) trend = '하락';
@@ -63,14 +65,31 @@
     return { growth, trend, prevShare, recentShare, pointChange };
   }
 
-  function analyze(records, rules, skipped) {
+  // 키워드 → 주제 이름 (rules.topics 위에서부터 먼저 맞는 것) · 없으면 null
+  function topicFinder(rules) {
+    const key = keyer(rules);
+    const list = rules.topics || [];
+    return k => {
+      const id = key(k);
+      const hit = list.find(tp => tp.pattern.test(id));
+      return hit ? hit.name : null;
+    };
+  }
+
+  // unit: 'keyword' 키워드마다 · 'topic' 주제마다 (rules.topics가 있을 때)
+  function analyze(records, rules, skipped, unit) {
     const norm = normalizer(rules);
     const key = keyer(rules);
     const groupCol = rules.columns.group;
     const t = rules.trend;
+    const byTopic = unit === 'topic' && (rules.topics || []).length > 0;
+    const topicOf = topicFinder(rules);
     const summary = {
       total: records.length, bySource: {}, byYear: {},
-      skipped: (skipped || []).map(s => s.line), fromTitle: 0, basis: t.basis || 'count'
+      skipped: (skipped || []).map(s => s.line), fromTitle: 0, basis: t.basis || 'count',
+      unit: byTopic ? 'topic' : 'keyword',
+      unmatched: {},       // 주제 밖 키워드 → 자료 수 (주제로 볼 때)
+      noTopic: 0           // 어느 주제에도 안 들어간 자료 수
     };
     const map = new Map();
 
@@ -82,7 +101,19 @@
       const g = (groupCol && rec[groupCol]) || '';
       summary.byYear[y] = (summary.byYear[y] || 0) + 1;
       if (g) summary.bySource[g] = (summary.bySource[g] || 0) + 1;
-      keywords.forEach(k => {
+      let units = keywords;
+      if (byTopic) {
+        const topics = [];
+        keywords.forEach(k => {
+          const tp = topicOf(k);
+          if (!tp) summary.unmatched[k] = (summary.unmatched[k] || 0) + 1;
+          else if (!topics.includes(tp)) topics.push(tp);
+        });
+        if (!topics.length) summary.noTopic++;
+        units = topics;
+      }
+      rec.units = units;
+      units.forEach(k => {
         const id = key(k);
         const e = map.get(id) || { keyword: k, counts: {}, bySource: {}, total: 0, lines: [] };
         e.total++;
@@ -126,5 +157,5 @@
     return { results, summary };
   }
 
-  window.Keywords = { analyze, judge };
+  window.Keywords = { analyze, judge, topicFinder };
 })();
