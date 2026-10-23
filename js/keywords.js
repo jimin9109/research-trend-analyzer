@@ -42,20 +42,25 @@
     return { keywords: out, fromTitle };
   }
 
-  // 판정 순서: 판정 보류(두 구간 합 < minCount) → 신규(이전 구간 0) → 상승 · 하락 · 유지
+  // 판정 순서: 판정 보류(합계 < minCount) → 신규(이전 구간 0) → 상승 · 하락 · 유지
   // basis가 'share'면 건수 대신 그 구간 전체 자료 중 비중으로 증가율을 셈
-  function judge(previous, recent, t, prevTotal, recentTotal) {
+  // minPointChange가 있으면 비중 차이(%p)도 그만큼 나야 상승 · 하락
+  function judge(previous, recent, t, prevTotal, recentTotal, total) {
+    const prevShare = prevTotal ? previous / prevTotal : null;
+    const recentShare = recentTotal ? recent / recentTotal : null;
     const share = t.basis === 'share' && prevTotal && recentTotal;
-    const before = share ? previous / prevTotal : previous;
-    const after = share ? recent / recentTotal : recent;
+    const before = share ? prevShare : previous;
+    const after = share ? recentShare : recent;
     const growth = before ? (after - before) / before : null;
+    const pointChange = prevShare != null && recentShare != null ? (recentShare - prevShare) * 100 : null;
+    const bigEnough = sign => !t.minPointChange || (pointChange != null && sign * pointChange >= t.minPointChange);
     let trend;
-    if (previous + recent < t.minCount) trend = '판정 보류';
+    if ((total != null ? total : previous + recent) < t.minCount) trend = '판정 보류';
     else if (previous === 0) trend = '신규';
-    else if (growth >= t.rise) trend = '상승';
-    else if (growth <= t.fall) trend = '하락';
+    else if (growth >= t.rise && bigEnough(1)) trend = '상승';
+    else if (growth <= t.fall && bigEnough(-1)) trend = '하락';
     else trend = '유지';
-    return { growth, trend };
+    return { growth, trend, prevShare, recentShare, pointChange };
   }
 
   function analyze(records, rules, skipped) {
@@ -91,10 +96,16 @@
     const years = records.map(r => r.year);
     const last = years.length ? Math.max(...years) : 0;
     const recentYears = [], previousYears = [];
-    for (let i = 0; i < t.window; i++) {
-      recentYears.push(String(last - i));
-      previousYears.push(String(last - t.window - i));
+    for (let i = 0; i < t.window; i++) recentYears.push(String(last - i));
+    if (t.previous === 'all') {
+      // 최근 구간 앞의 자료가 있는 모든 연도
+      Object.keys(summary.byYear).filter(y => +y <= last - t.window).forEach(y => previousYears.push(y));
+    } else {
+      const n = t.previous || t.window;
+      for (let i = 0; i < n; i++) previousYears.push(String(last - t.window - i));
     }
+    previousYears.sort().reverse();
+    summary.years = Object.keys(summary.byYear).sort();
     summary.lastYear = last;
     summary.recentYears = recentYears.slice().reverse();
     summary.previousYears = previousYears.slice().reverse();
@@ -110,7 +121,7 @@
       const shareBySource = {};
       groups.forEach(g => { shareBySource[g] = (e.bySource[g] || 0) / summary.bySource[g]; });
       return Object.assign(e, { recent, previous, shareBySource },
-        judge(previous, recent, t, summary.previousTotal, summary.recentTotal));
+        judge(previous, recent, t, summary.previousTotal, summary.recentTotal, e.total));
     });
     return { results, summary };
   }

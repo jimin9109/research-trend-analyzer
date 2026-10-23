@@ -21,11 +21,32 @@
     return TREND_ORDER.filter(t => found.includes(t)).concat(found.filter(t => !TREND_ORDER.includes(t)));
   }
 
-  // 1.25 → "+125%" · 이전 3년이 0건이라 계산할 수 없으면 "—"
+  // 1.25 → "+125.0%" · 이전 구간이 0건이라 계산할 수 없으면 "—"
   function pct(growth) {
     if (growth == null || !Number.isFinite(growth)) return '—';
-    const v = Math.round(growth * 100);
-    return (v > 0 ? '+' : '') + v + '%';
+    // 소수 한 자리까지: 기준(±50%) 바로 옆 값이 반올림으로 기준을 넘어 보이지 않게
+    const v = Math.round(growth * 1000) / 10;
+    return (v > 0 ? '+' : '') + v.toFixed(1) + '%';
+  }
+
+  // 건수와 비중을 한 칸에: "18 · 6.2%" · 전체 건수를 모르면 건수만
+  function countShare(n, total) {
+    n = n || 0;
+    if (!total) return String(n);
+    return `${n} · ${(Math.round(n / total * 1000) / 10).toFixed(1)}%`;
+  }
+
+  // 변화: "+305% · +4.7%p" · 비중 차이가 없으면 증가율만
+  function change(r) {
+    const g = pct(r.growth);
+    if (r.pointChange == null) return g;
+    const pp = Math.round(r.pointChange * 10) / 10;
+    return `${g} · ${pp > 0 ? '+' : ''}${pp.toFixed(1)}%p`;
+  }
+
+  // 표의 연도 열: 자료가 있는 연도만
+  function tableYears(results, summary) {
+    return (summary && summary.years) || window.Charts.yearsOf(results, summary);
   }
 
   function byTotal(a, b) {
@@ -40,7 +61,7 @@
     return [
       p.length ? `이전 ${span(p)}` : '이전 3년',
       r.length ? `최근 ${span(r)}` : '최근 3년',
-      summary && summary.basis === 'share' ? '비중 증가율' : '증가율'
+      summary && summary.basis === 'share' ? '비중 변화' : '증가율'
     ];
   }
 
@@ -90,13 +111,13 @@
       const rows = filterResults(results, state.trend, state.query);
       count.textContent = `${rows.length}개 키워드`;
       clear(tableWrap);
-      tableWrap.append(buildTable(rows, sources, labels, opts.onSelect));
+      tableWrap.append(buildTable(rows, sources, labels, opts.onSelect, summary));
     }
 
     search.addEventListener('input', () => { state.query = search.value; draw(); });
     csvBtn.addEventListener('click', () => {
       const rows = filterResults(results, state.trend, state.query);
-      download('keyword-trends.csv', toCSV(rows, sources, years), 'text/csv');
+      download('keyword-trends.csv', toCSV(rows, sources, years, summary), 'text/csv');
     });
     mdBtn.addEventListener('click', () => {
       download('keyword-trends.md', toMarkdown(results, summary, sources, labels), 'text/markdown');
@@ -104,9 +125,11 @@
     draw();
   }
 
-  function buildTable(rows, sources, labels, onSelect) {
+  function buildTable(rows, sources, labels, onSelect, summary) {
     const table = el('table', 'trend-table');
-    const head = ['키워드', '합계'].concat(sources, labels, ['판정']);
+    const years = summary ? tableYears(rows, summary) : [];
+    const byYear = (summary && summary.byYear) || {};
+    const head = ['키워드', '합계'].concat(sources, years, labels, ['판정']);
     const thead = el('thead');
     const tr = el('tr');
     head.forEach(h => tr.append(el('th', null, h)));
@@ -130,10 +153,11 @@
       }
       row.append(el('td', 'kw', r.keyword), el('td', 'num', String(r.total)));
       sources.forEach(s => row.append(el('td', 'num', String((r.bySource || {})[s] || 0))));
+      years.forEach(y => row.append(el('td', 'num year', countShare((r.counts || {})[y], byYear[y]))));
       row.append(
-        el('td', 'num', String(r.previous ?? '')),
-        el('td', 'num', String(r.recent ?? '')),
-        el('td', 'num', pct(r.growth))
+        el('td', 'num', countShare(r.previous, summary && summary.previousTotal)),
+        el('td', 'num', countShare(r.recent, summary && summary.recentTotal)),
+        el('td', 'num', change(r))
       );
       const badge = el('span', 'badge trend-' + (r.trend || 'none').replace(/\s/g, ''), r.trend || '—');
       const td = el('td');
@@ -169,14 +193,22 @@
   }
 
   // 표에 보이는 키워드를 CSV로 · 연도별 개수 열 포함 · growth는 소수 그대로
-  function toCSV(rows, sources, years) {
-    const header = ['keyword', 'total'].concat(sources, years, ['previous', 'recent', 'growth', 'trend']);
+  function toCSV(rows, sources, years, summary) {
+    const byYear = (summary && summary.byYear) || {};
+    const share = (n, total) => total ? Math.round((n || 0) / total * 10000) / 10000 : '';
+    const header = ['keyword', 'total'].concat(sources, years, years.map(y => 'share_' + y),
+      ['previous', 'recent', 'previous_share', 'recent_share', 'growth', 'point_change', 'trend']);
     const lines = [header.map(csvCell).join(',')];
     rows.forEach(r => {
       lines.push([r.keyword, r.total]
         .concat(sources.map(s => (r.bySource || {})[s] || 0))
         .concat(years.map(y => (r.counts || {})[y] || 0))
-        .concat([r.previous, r.recent, r.growth == null ? '' : r.growth, r.trend])
+        .concat(years.map(y => share((r.counts || {})[y], byYear[y])))
+        .concat([r.previous, r.recent,
+          r.prevShare == null ? '' : Math.round(r.prevShare * 10000) / 10000,
+          r.recentShare == null ? '' : Math.round(r.recentShare * 10000) / 10000,
+          r.growth == null ? '' : Math.round(r.growth * 10000) / 10000,
+          r.pointChange == null ? '' : Math.round(r.pointChange * 100) / 100, r.trend])
         .map(csvCell).join(','));
     });
     return lines.join('\r\n') + '\r\n';
@@ -201,7 +233,8 @@
       const head = ['키워드', '합계'].concat(sources, labels);
       out.push('| ' + head.join(' | ') + ' |', '|' + head.map(() => '---').join('|') + '|');
       rows.forEach(r => {
-        const cells = [r.keyword, r.total].concat(sources.map(s => (r.bySource || {})[s] || 0), [r.previous, r.recent, pct(r.growth)]);
+        const cells = [r.keyword, r.total].concat(sources.map(s => (r.bySource || {})[s] || 0),
+          [countShare(r.previous, summary.previousTotal), countShare(r.recent, summary.recentTotal), change(r)]);
         out.push('| ' + cells.map(mdCell).join(' | ') + ' |');
       });
       out.push('');

@@ -287,10 +287,11 @@
     const items = [
       ['키워드 출처', `${RULES.columns.keywords} 칸 (비면 제목 낱말)`],
       ['거르기', RULES.filter ? `제외 ${RULES.filter.exclude.length}개 · 포함 ${RULES.filter.include.length}개 규칙` : '없음'],
-      ['판정 구간', `마지막 연도 기준 최근 ${t.window}년 vs 이전 ${t.window}년`],
-      ['비교 단위', t.basis === 'share' ? '그해 자료 중 비중(%)' : '건수'],
-      ['상승 · 하락', `+${Math.round(t.rise * 100)}% 이상 · ${Math.round(t.fall * 100)}% 이하`],
-      ['판정 보류', `두 구간 합 ${t.minCount}건 미만`],
+      ['판정 구간', `최근 ${t.window}년(마지막 연도) vs 이전 ${t.previous === 'all' ? '모든 연도 합계' : (t.previous || t.window) + '년'}`],
+      ['비교 단위', t.basis === 'share' ? '구간 자료 중 비중(%) · 표에는 건수도 함께' : '건수'],
+      ['상승 · 하락', `비중 +${Math.round(t.rise * 100)}% 이상 · ${Math.round(t.fall * 100)}% 이하`
+        + (t.minPointChange ? `, 그리고 차이 ±${t.minPointChange}%p 이상` : '')],
+      ['판정 보류', `전체 합계 ${t.minCount}건 미만`],
       ['신규', '이전 구간 0건'],
       ['불용어', `${RULES.stopwords.length}개`],
       ['동의어', `${Object.keys(RULES.synonyms).length}쌍`],
