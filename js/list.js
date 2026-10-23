@@ -274,7 +274,7 @@
     const rows = records
       .filter(r => !key || (r.units || r.cleanKeywords || []).some(k => k.toLowerCase() === key))
       .sort((a, b) => b.year - a.year || a.line - b.line);
-    container.append(el('p', 'list-count', keyword ? `'${keyword}' 자료 ${rows.length}건` : `전체 자료 ${rows.length}건`));
+    container.append(el('p', 'list-count', keyword ? `'${keyword}' 자료 ${rows.length}건` : `${opts.scopeLabel || '전체'} 자료 ${rows.length}건`));
     const table = el('table', 'trend-table records');
     const tr = el('tr');
     ['연도', opts.groupLabel || '분야', '제목', '키워드'].forEach(h => tr.append(el('th', null, h)));

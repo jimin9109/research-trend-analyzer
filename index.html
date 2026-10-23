@@ -32,6 +32,10 @@
   .chip { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; display: flex; gap: 6px; align-items: baseline; }
   .chip-label { font-size: 13px; color: #4b5563; }
   .chip-value { font-size: 18px; }
+  .chip.clickable { font: inherit; color: inherit; cursor: pointer; }
+  .chip.clickable:hover { border-color: #93b4f5; }
+  .chip.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .chip.active .chip-label { color: #cbd5e1; }
   .bar-label, .axis { font-size: 12px; fill: #374151; }
   .bar-value, .point-value { font-size: 11px; fill: #374151; }
   .bar-row:hover rect { opacity: .8; }
@@ -170,7 +174,7 @@
 <script>
   const RULES = window.RULES;
   const $ = id => document.getElementById(id);
-  const state = { records: [], columns: [], results: [], summary: null, filtered: null, read: null, selected: '',
+  const state = { records: [], columns: [], results: [], summary: null, filtered: null, read: null, selected: '', source: '', base: null,
     unit: RULES.view === 'keyword' || !(RULES.topics || []).length ? 'keyword' : 'topic' };
   document.title = RULES.title;
   $('page-title').textContent = RULES.title;
@@ -189,7 +193,11 @@
     if (!read.records.length) { setStatus('읽을 수 있는 자료가 없습니다.', true); return; }
     const filtered = Filter.apply(read.records, RULES);
     if (!filtered.kept.length) { setStatus(`${read.records.length}건을 읽었지만 거르기 규칙에 맞는 자료가 없습니다. rules.js의 filter를 확인하세요.`, true); return; }
-    Object.assign(state, { records: filtered.kept, columns: read.columns, filtered, read, selected: '' });
+    // 상단 칸에 늘 보일 전체 건수 (과제 · 논문을 골라도 그대로)
+    const bySource = {};
+    filtered.kept.forEach(r => { const g = r[RULES.columns.group]; if (g) bySource[g] = (bySource[g] || 0) + 1; });
+    const base = { total: filtered.kept.length, bySource, skipped: read.skipped.map(x => x.line) };
+    Object.assign(state, { records: filtered.kept, columns: read.columns, filtered, read, base, source: '', selected: '' });
     runAnalysis();
   }
 
@@ -197,14 +205,17 @@
   function runAnalysis() {
     const { read, filtered } = state;
     if (!filtered) { renderUnitToggle(); return; }
-    const { results, summary } = Keywords.analyze(filtered.kept, RULES, read.skipped, state.unit);
-    Object.assign(state, { results, summary, selected: '' });
+    // 상단에서 과제나 논문을 골랐으면 그 자료만으로 다시 셈
+    const records = state.source ? filtered.kept.filter(r => r[RULES.columns.group] === state.source) : filtered.kept;
+    const { results, summary } = Keywords.analyze(records, RULES, read.skipped, state.unit);
+    Object.assign(state, { records, results, summary, selected: '' });
 
     const unitWord = summary.unit === 'topic' ? '주제' : '키워드';
     const msg = document.createElement('div');
     msg.append(`${read.records.length}건을 읽어 ${filtered.kept.length}건을 남기고 ${filtered.dropped.length}건을 뺐습니다. ${unitWord} ${results.length}개`
       + (summary.unit === 'topic' ? ` (주제가 없는 자료 ${summary.noTopic}건)` : '')
-      + `. 건너뛴 줄 ${read.skipped.length ? read.skipped.length + '개' : '없음'}.`);
+      + `. 건너뛴 줄 ${read.skipped.length ? read.skipped.length + '개' : '없음'}.`
+      + (state.source ? ` 지금은 ${state.source} ${records.length}건만 보고 있습니다 (위의 '총'을 누르면 전체).` : ''));
     if (read.skipped.length) {
       const ul = document.createElement('ul');
       read.skipped.forEach(s => { const li = document.createElement('li'); li.textContent = `${s.line}번째 줄: ${s.reason}`; ul.append(li); });
@@ -229,8 +240,8 @@
     renderUnitToggle();
     $('top-title').textContent = '상위 ' + unitWord;
     $('list-title').textContent = unitWord + ' 추세 목록';
-    Charts.renderSummary($('summary'), summary);
-    Charts.renderTopBar($('top-bar'), results, { n: RULES.topN, summary, onSelect: select });
+    Charts.renderSummary($('summary'), state.base, { onSelect: chooseSource, active: state.source });
+    Charts.renderTopBar($('top-bar'), results, { n: RULES.topN, summary, onSelect: select, allSources: Object.keys(state.base.bySource) });
     fillSelect();
     renderTrend();
     List.renderTrendSection($('trend-list'), results, summary, { onSelect: select });
@@ -243,7 +254,11 @@
       $('held-hint').textContent = `합계 2~${RULES.trend.minCount - 1}건이라 판정하지 않은 키워드 · 한 번만 나온 키워드는 목록의 '한 번만 나옴' 탭`;
       List.renderHeld($('held'), results);
     }
-    List.renderGap($('gap'), results, summary, { n: 8, minCount: RULES.trend.minCount, onSelect: select });
+    if (state.source) {
+      $('gap').innerHTML = '<p class="empty">과제와 논문을 함께 볼 때만 비교합니다. 위의 \'총\'을 누르세요.</p>';
+    } else {
+      List.renderGap($('gap'), results, summary, { n: 8, minCount: RULES.trend.minCount, onSelect: select });
+    }
     renderFilter();
     renderRecords();
     renderRules();
@@ -275,7 +290,7 @@
   function renderRecords() {
     $('records-title').textContent = state.selected ? `자료 목록 · ${state.selected}` : '자료 목록';
     List.renderRecords($('records'), state.records, state.selected, {
-      groupColumn: RULES.columns.group, groupLabel: '자료', linkColumn: RULES.columns.link
+      groupColumn: RULES.columns.group, groupLabel: '자료', linkColumn: RULES.columns.link, scopeLabel: state.source || '전체'
     });
   }
 
@@ -349,6 +364,11 @@
   }
 
   $('analyze').addEventListener('click', analyze);
+  function chooseSource(group) {
+    state.source = group === state.source ? '' : group;
+    runAnalysis();
+  }
+
   $('unit-topic').addEventListener('click', () => { state.unit = 'topic'; runAnalysis(); });
   $('unit-keyword').addEventListener('click', () => { state.unit = 'keyword'; runAnalysis(); });
   renderUnitToggle();
@@ -383,7 +403,7 @@
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
       if (!state.summary) return;
-      Charts.renderTopBar($('top-bar'), state.results, { n: RULES.topN, summary: state.summary, onSelect: select });
+      Charts.renderTopBar($('top-bar'), state.results, { n: RULES.topN, summary: state.summary, onSelect: select, allSources: Object.keys(state.base.bySource) });
       renderTrend();
     }, 150);
   });

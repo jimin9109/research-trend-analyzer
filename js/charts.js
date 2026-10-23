@@ -40,6 +40,14 @@
     return measureCtx.measureText(s).width;
   }
 
+  // 칸보다 긴 이름은 끝을 '…'로 줄임 (전체 이름은 막대에 마우스를 올리면 보임)
+  function fitText(s, maxW) {
+    if (textWidth(s) <= maxW) return s;
+    let t = s;
+    while (t.length > 1 && textWidth(t + '…') > maxW) t = t.slice(0, -1);
+    return t.trimEnd() + '…';
+  }
+
   function fmt(n) {
     return Number(n || 0).toLocaleString('ko-KR');
   }
@@ -64,16 +72,26 @@
     return years;
   }
 
-  function renderSummary(container, summary) {
+  // opts.onSelect(group): '총'이나 그룹(과제 · 논문) 칸을 누르면 호출 ('' = 전체) · opts.active: 지금 고른 그룹
+  function renderSummary(container, summary, opts) {
+    opts = opts || {};
     clear(container);
-    const chips = [['총', summary.total]];
-    Object.entries(summary.bySource || {}).forEach(([name, n]) => chips.push([name, n]));
-    chips.push(['건너뛴 줄', (summary.skipped || []).length]);
-    chips.forEach(([label, value]) => {
-      const chip = el('div', 'chip');
+    const chips = [['총', summary.total, '']];
+    Object.entries(summary.bySource || {}).forEach(([name, n]) => chips.push([name, n, name]));
+    chips.forEach(([label, value, group]) => {
+      const chip = el(opts.onSelect ? 'button' : 'div', 'chip' + (opts.onSelect ? ' clickable' : '') + ((opts.active || '') === group ? ' active' : ''));
       chip.append(el('span', 'chip-label', label), el('strong', 'chip-value', fmt(value)));
+      if (opts.onSelect) {
+        chip.type = 'button';
+        chip.title = group ? `${group}만 보기` : '전체 보기';
+        chip.setAttribute('aria-pressed', String((opts.active || '') === group));
+        chip.addEventListener('click', () => opts.onSelect(group));
+      }
       container.append(chip);
     });
+    const skipped = el('div', 'chip');
+    skipped.append(el('span', 'chip-label', '건너뛴 줄'), el('strong', 'chip-value', fmt((summary.skipped || []).length)));
+    container.append(skipped);
   }
 
   // 상위 키워드 막대 · 자료 종류별로 이어 붙인 막대 · 막대를 누르면 onSelect(keyword)
@@ -82,6 +100,8 @@
     clear(container);
     const n = opts.n || 10;
     const sources = sourcesOf(results, opts.summary);
+    // 색은 전체 그룹 순서로 고정 (논문만 볼 때도 논문은 같은 색) · opts.allSources가 없으면 지금 그룹 순서
+    const colorOf = s => SOURCE_COLORS[Math.max(0, (opts.allSources || sources).indexOf(s)) % SOURCE_COLORS.length];
     const top = results.slice()
       .sort((a, b) => b.total - a.total || a.keyword.localeCompare(b.keyword, 'ko'))
       .slice(0, n);
@@ -105,15 +125,15 @@
       const row = svgEl('g', { class: 'bar-row', 'data-keyword': r.keyword });
       row.style.cursor = opts.onSelect ? 'pointer' : 'default';
       row.append(svgEl('title', {}, `${r.keyword}: ${fmt(r.total)}건`));
-      row.append(svgEl('text', { x: labelW - 8, y: y + rowH / 2 + 4, 'text-anchor': 'end', class: 'bar-label' }, r.keyword));
+      row.append(svgEl('text', { x: labelW - 8, y: y + rowH / 2 + 4, 'text-anchor': 'end', class: 'bar-label' }, fitText(r.keyword, labelW - 12)));
 
       let x = labelW;
-      sources.forEach((s, si) => {
+      sources.forEach(s => {
         const v = (r.bySource || {})[s] || 0;
         if (!v) return;
         const w = (v / max) * barMax;
         const rect = svgEl('rect', { x, y: y + 5, width: Math.max(w, 1), height: rowH - 10, rx: 2 });
-        rect.style.fill = SOURCE_COLORS[si % SOURCE_COLORS.length];
+        rect.style.fill = colorOf(s);
         row.append(rect);
         x += w;
       });
@@ -132,10 +152,10 @@
 
     if (sources.length) {
       const legend = el('div', 'legend');
-      sources.forEach((s, si) => {
+      sources.forEach(s => {
         const item = el('span', 'legend-item');
         const swatch = el('span', 'swatch');
-        swatch.style.background = SOURCE_COLORS[si % SOURCE_COLORS.length];
+        swatch.style.background = colorOf(s);
         item.append(swatch, document.createTextNode(s));
         legend.append(item);
       });
