@@ -13,6 +13,13 @@
     const tally = (m, k) => { m[k] = (m[k] || 0) + 1; };
 
     records.forEach(rec => {
+      // 분석 기간 밖 자료는 먼저 뺌
+      if (f.yearFrom && rec.year < f.yearFrom) {
+        const why = `${f.yearFrom}년 이전 자료`;
+        dropped.push({ rec, reason: why });
+        tally(droppedBy, why);
+        return;
+      }
       const strong = textOf(rec, f.strong);
       const long = textOf(rec, f.long);
       const usesProgram = f.program && (!f.program.source || rec[rules.columns.group] === f.program.source);

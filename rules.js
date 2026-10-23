@@ -16,6 +16,8 @@ window.RULES = {
   // ── 1. 거르기: 검색어 'AX'에 섞여 들어온 다른 뜻의 자료를 뺌 ─────────────
   // 위에서부터 차례로 봄 · exclude에 걸리면 뺌 → include 중 하나에 걸리면 남김 → 아무것도 아니면 뺌
   filter: {
+    // 분석 시작 연도: AI 전환이라는 뜻의 AX는 2024년에 처음 나옴 · 2023년 이전에 남던 3건은 같은 과제 하나(2019~2021)가 해마다 반복된 것
+    yearFrom: 2023,
     strong: ['title', 'title_en', 'keywords', 'keywords_en'],   // 제목 · 키워드
     long: ['summary'],                                          // 요약 · 초록
     program: { columns: ['program'], source: '과제' },          // 사업명 (과제에만)

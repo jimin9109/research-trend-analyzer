@@ -165,12 +165,12 @@
   </section>
 </main>
 
-<script src="rules.js?v=20261023-4"></script>
-<script src="js/import.js?v=20261023-4"></script>
-<script src="js/filter.js?v=20261023-4"></script>
-<script src="js/keywords.js?v=20261023-4"></script>
-<script src="js/charts.js?v=20261023-4"></script>
-<script src="js/list.js?v=20261023-4"></script>
+<script src="rules.js?v=20261023-5"></script>
+<script src="js/import.js?v=20261023-5"></script>
+<script src="js/filter.js?v=20261023-5"></script>
+<script src="js/keywords.js?v=20261023-5"></script>
+<script src="js/charts.js?v=20261023-5"></script>
+<script src="js/list.js?v=20261023-5"></script>
 <script>
   const RULES = window.RULES;
   const $ = id => document.getElementById(id);
@@ -339,6 +339,7 @@
     const t = RULES.trend;
     const items = [
       ['키워드 출처', `${RULES.columns.keywords} 칸 (비면 제목 낱말)`],
+      ['분석 기간', RULES.filter && RULES.filter.yearFrom ? `${RULES.filter.yearFrom}년부터` : '전체'],
       ['거르기', RULES.filter ? `제외 ${RULES.filter.exclude.length}개 · 포함 ${RULES.filter.include.length}개 규칙` : '없음'],
       ['판정 구간', `최근 ${t.window}년(마지막 연도) vs 이전 ${t.previous === 'all' ? '모든 연도 합계' : (t.previous || t.window) + '년'}`],
       ['비교 단위', t.basis === 'share' ? '구간 자료 중 비중(%) · 표에는 건수도 함께' : '건수'],
