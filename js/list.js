@@ -32,12 +32,16 @@
     return b.total - a.total || a.keyword.localeCompare(b.keyword, 'ko');
   }
 
-  // 표 머리말: 요약에 판정 구간이 있으면 실제 연도로 (예: 이전 2021–2023)
+  // 표 머리말: [이전 구간, 최근 구간, 증가율] · 요약에 판정 구간이 있으면 실제 연도로 (예: 이전 2021–2023 · 2025)
   function periodLabels(summary) {
     const p = (summary && summary.previousYears) || [];
     const r = (summary && summary.recentYears) || [];
-    const span = ys => ys.length ? `${ys[0]}–${ys[ys.length - 1]}` : '';
-    return [p.length ? `이전 ${span(p)}` : '이전 3년', r.length ? `최근 ${span(r)}` : '최근 3년'];
+    const span = ys => ys.length > 1 ? `${ys[0]}–${ys[ys.length - 1]}` : (ys[0] || '');
+    return [
+      p.length ? `이전 ${span(p)}` : '이전 3년',
+      r.length ? `최근 ${span(r)}` : '최근 3년',
+      summary && summary.basis === 'share' ? '비중 증가율' : '증가율'
+    ];
   }
 
   function filterResults(results, trend, query) {
@@ -60,7 +64,7 @@
     const head = el('div', 'list-head');
     const search = el('input', 'search');
     search.type = 'search';
-    search.placeholder = '키워드 검색 (예: 환자중심성)';
+    search.placeholder = '키워드 검색';
     const csvBtn = el('button', 'btn', 'CSV 내보내기');
     const mdBtn = el('button', 'btn', '마크다운 내보내기');
     head.append(search, csvBtn, mdBtn);
@@ -102,7 +106,7 @@
 
   function buildTable(rows, sources, labels, onSelect) {
     const table = el('table', 'trend-table');
-    const head = ['키워드', '합계'].concat(sources, labels, ['증가율', '판정']);
+    const head = ['키워드', '합계'].concat(sources, labels, ['판정']);
     const thead = el('thead');
     const tr = el('tr');
     head.forEach(h => tr.append(el('th', null, h)));
@@ -185,7 +189,7 @@
   // 요약 + 판정별 표 · 판정 보류는 맨 끝에 키워드만
   function toMarkdown(results, summary, sources, labels) {
     labels = labels || periodLabels(summary);
-    const out = ['# 환자경험평가 연구 키워드 동향', ''];
+    const out = ['# ' + ((window.RULES && window.RULES.title) || '키워드 동향'), ''];
     const parts = [`총 ${summary.total}건`].concat(Object.entries(summary.bySource || {}).map(([k, v]) => `${k} ${v}건`));
     out.push(`- ${parts.join(' · ')}`);
     if ((summary.skipped || []).length) out.push(`- 건너뛴 줄: ${summary.skipped.join(', ')}`);
@@ -194,7 +198,7 @@
     trendsOf(results).filter(t => t !== HELD).forEach(t => {
       const rows = results.filter(r => r.trend === t).sort(byTotal);
       out.push(`## ${t} (${rows.length})`, '');
-      const head = ['키워드', '합계'].concat(sources, labels, ['증가율']);
+      const head = ['키워드', '합계'].concat(sources, labels);
       out.push('| ' + head.join(' | ') + ' |', '|' + head.map(() => '---').join('|') + '|');
       rows.forEach(r => {
         const cells = [r.keyword, r.total].concat(sources.map(s => (r.bySource || {})[s] || 0), [r.previous, r.recent, pct(r.growth)]);
@@ -260,5 +264,43 @@
     container.append(wrap);
   }
 
-  window.List = { renderTrendSection, renderHeld, renderRecords, toCSV, toMarkdown, pct, download };
+  // 두 그룹(예: 과제 · 논문)에서 비중 차이가 큰 키워드 · 그룹마다 자료 수가 달라 건수 대신 비중으로 비교
+  // opts: { n, minCount, onSelect }
+  function renderGap(container, results, summary, opts) {
+    opts = opts || {};
+    clear(container);
+    const groups = Object.keys((summary && summary.bySource) || {});
+    if (groups.length !== 2) {
+      container.append(el('p', 'empty', '비교하려면 그룹이 두 개(예: 과제 · 논문)여야 합니다.'));
+      return;
+    }
+    const [a, b] = groups;
+    const n = opts.n || 8;
+    const pool = results.filter(r => r.total >= (opts.minCount || 1))
+      .map(r => ({ r, gap: (r.shareBySource[a] || 0) - (r.shareBySource[b] || 0) }));
+    const pctOf = v => (Math.round(v * 1000) / 10).toFixed(1) + '%';
+    const side = (title, rows) => {
+      const box = el('div', 'gap-side');
+      box.append(el('h3', null, title));
+      if (!rows.length) { box.append(el('p', 'empty', '없음')); return box; }
+      const ul = el('ul', 'gap-list');
+      rows.forEach(({ r }) => {
+        const li = el('li');
+        if (opts.onSelect) { li.className = 'clickable'; li.addEventListener('click', () => opts.onSelect(r.keyword)); }
+        li.append(el('span', 'kw', r.keyword),
+          el('span', 'num', `${a} ${pctOf(r.shareBySource[a] || 0)} · ${b} ${pctOf(r.shareBySource[b] || 0)}`));
+        ul.append(li);
+      });
+      box.append(ul);
+      return box;
+    };
+    const wrap = el('div', 'gap-wrap');
+    wrap.append(
+      side(`${a}에서 더 많이`, pool.filter(x => x.gap > 0).sort((x, y) => y.gap - x.gap).slice(0, n)),
+      side(`${b}에서 더 많이`, pool.filter(x => x.gap < 0).sort((x, y) => x.gap - y.gap).slice(0, n))
+    );
+    container.append(el('p', 'list-count', `${a} ${summary.bySource[a]}건 · ${b} ${summary.bySource[b]}건 중 그 키워드가 붙은 비율 · 합계 ${opts.minCount || 1}건 이상`), wrap);
+  }
+
+  window.List = { renderGap, renderTrendSection, renderHeld, renderRecords, toCSV, toMarkdown, pct, download };
 })();

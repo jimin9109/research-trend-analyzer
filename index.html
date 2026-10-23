@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>환자경험평가 연구 동향 분석기</title>
+<title>AX(AI 전환) 연구 동향 분석기</title>
 <style>
   :root { --navy: #0f1f3d; --line: #e3e7ef; --muted: #6b7280; --bg: #f3f5f9; }
   * { box-sizing: border-box; }
@@ -66,23 +66,35 @@
   .rules dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; font-size: 13px; }
   .rules dt { color: var(--muted); }
   .rules dd { margin: 0; }
+  .gap-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  .gap-side h3 { font-size: 13px; margin: 6px 0; color: #374151; }
+  .gap-list, .filter-list { list-style: none; padding: 0; margin: 0; }
+  .gap-list li, .filter-list li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid #eef0f4; font-size: 13px; }
+  .gap-list li.clickable { cursor: pointer; }
+  .gap-list li.clickable:hover { background: #f5f8ff; }
+  .filter-list .num, .gap-list .num { white-space: nowrap; color: #4b5563; }
+  details { margin-top: 8px; font-size: 13px; }
+  details summary { cursor: pointer; color: #1d4ed8; }
+  .dropped { max-height: 260px; overflow-y: auto; margin: 6px 0 0; padding-left: 18px; }
+  .dropped li { margin: 3px 0; }
+  .dropped small { color: var(--muted); }
   .empty { color: var(--muted); font-size: 13px; }
   .placeholder { color: var(--muted); font-size: 13px; padding: 30px 0; text-align: center; }
   @media (max-width: 1100px) { main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .input-card { grid-column: 1 / -1; } .span2 { grid-column: 1 / -1; } }
-  @media (max-width: 720px) { main { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; } .span2, .span3 { grid-column: 1; } }
+  @media (max-width: 720px) { main { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; } .span2, .span3 { grid-column: 1; } .gap-wrap { grid-template-columns: minmax(0, 1fr); } }
 </style>
 </head>
 <body>
 <header>
-  <h1>환자경험평가 연구 동향 분석기</h1>
-  <p>연구 · 기술 · 정책 자료 목록을 넣으면 기준 파일(rules.js)대로 키워드를 정리해 연도별 흐름을 보여 줍니다</p>
+  <h1 id="page-title">AX(AI 전환) 연구 동향 분석기</h1>
+  <p id="page-subtitle"></p>
 </header>
 
 <main>
   <section class="card input-card">
     <h2>자료 목록 넣기</h2>
-    <p class="hint">CSV 첫 줄에 <code>year,title</code> 필수 · <code>keywords</code>(; 구분) · <code>field</code> · <code>url</code> 선택 · 붙여넣거나 파일을 고르세요</p>
-    <textarea id="input" spellcheck="false" placeholder="year,title,keywords,field&#10;2024,환자경험 측정도구 체계적 문헌고찰,PREM;측정도구,연구"></textarea>
+    <p class="hint">CSV 첫 줄에 <code>year,title</code> 필수 · <code>keywords</code>(쉼표 · ; 구분) · <code>source</code>(과제/논문) · <code>summary</code> 선택 · NTIS · KCI 파일은 <code>tools/prepare-ax.js</code>로 먼저 합치세요</p>
+    <textarea id="input" spellcheck="false" placeholder="id,source,year,title,keywords,summary&#10;N1,과제,2026,제조 AX 플랫폼 개발,&quot;AI 에이전트,디지털 트윈&quot;,..."></textarea>
     <div class="buttons">
       <button class="btn primary" id="load-sample">예시 불러오기</button>
       <label class="btn" for="file">파일 선택</label>
@@ -117,6 +129,16 @@
   </section>
 
   <section class="card span2">
+    <h2>과제 vs 논문 <small>그 키워드가 붙은 비율 차이가 큰 순 · 누르면 추이와 자료 목록에 표시</small></h2>
+    <div id="gap"><p class="placeholder">—</p></div>
+  </section>
+
+  <section class="card">
+    <h2>거르기 결과 <small>rules.js filter</small></h2>
+    <div id="filter"><p class="placeholder">—</p></div>
+  </section>
+
+  <section class="card span2">
     <h2><span id="records-title">자료 목록</span>
       <span class="buttons" style="margin:0">
         <button class="btn" id="records-all">전체 보기</button>
@@ -134,13 +156,17 @@
 
 <script src="rules.js"></script>
 <script src="js/import.js"></script>
+<script src="js/filter.js"></script>
 <script src="js/keywords.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/list.js"></script>
 <script>
   const RULES = window.RULES;
   const $ = id => document.getElementById(id);
-  const state = { records: [], columns: [], results: [], summary: null, selected: '' };
+  const state = { records: [], columns: [], results: [], summary: null, filtered: null, selected: '' };
+  document.title = RULES.title;
+  $('page-title').textContent = RULES.title;
+  $('page-subtitle').textContent = RULES.subtitle || '';
 
   function setStatus(html, isError) {
     const box = $('status');
@@ -153,11 +179,13 @@
     const read = Importer.read($('input').value, RULES);
     if (read.error) { setStatus(read.error, true); return; }
     if (!read.records.length) { setStatus('읽을 수 있는 자료가 없습니다.', true); return; }
-    const { results, summary } = Keywords.analyze(read.records, RULES, read.skipped);
-    Object.assign(state, { records: read.records, columns: read.columns, results, summary, selected: '' });
+    const filtered = Filter.apply(read.records, RULES);
+    if (!filtered.kept.length) { setStatus(`${read.records.length}건을 읽었지만 거르기 규칙에 맞는 자료가 없습니다. rules.js의 filter를 확인하세요.`, true); return; }
+    const { results, summary } = Keywords.analyze(filtered.kept, RULES, read.skipped);
+    Object.assign(state, { records: filtered.kept, columns: read.columns, results, summary, filtered, selected: '' });
 
     const msg = document.createElement('div');
-    msg.append(`${summary.total}건을 읽었습니다. 키워드 ${results.length}개. 건너뛴 줄 ${read.skipped.length ? read.skipped.length + '개' : '없음'}.`);
+    msg.append(`${read.records.length}건을 읽어 ${filtered.kept.length}건을 남기고 ${filtered.dropped.length}건을 뺐습니다. 키워드 ${results.length}개. 건너뛴 줄 ${read.skipped.length ? read.skipped.length + '개' : '없음'}.`);
     if (read.skipped.length) {
       const ul = document.createElement('ul');
       read.skipped.forEach(s => { const li = document.createElement('li'); li.textContent = `${s.line}번째 줄: ${s.reason}`; ul.append(li); });
@@ -177,6 +205,8 @@
     renderTrend();
     List.renderTrendSection($('trend-list'), results, summary, { onSelect: select });
     List.renderHeld($('held'), results);
+    List.renderGap($('gap'), results, summary, { n: 8, minCount: RULES.trend.minCount, onSelect: select });
+    renderFilter();
     renderRecords();
     renderRules();
   }
@@ -196,14 +226,18 @@
     const r = results.find(x => x.keyword === selected);
     if (r) series.push({ label: r.keyword, counts: r.counts });
     Charts.renderTrend($('trend'), series, years);
-    $('trend-note').textContent = `판정 구간: 이전 ${summary.previousYears[0]}–${summary.previousYears.at(-1)} · 최근 ${summary.recentYears[0]}–${summary.recentYears.at(-1)}`
-      + (r ? ` · ${r.keyword}: 이전 ${r.previous} → 최근 ${r.recent} (${List.pct(r.growth)}, ${r.trend})` : '');
+    const span = ys => ys.length > 1 ? `${ys[0]}–${ys.at(-1)}` : ys[0];
+    const share = (n, total) => total ? ` (${(Math.round(n / total * 1000) / 10).toFixed(1)}%)` : '';
+    const byShare = summary.basis === 'share';
+    $('trend-note').textContent = `판정 구간: 이전 ${span(summary.previousYears)} ${summary.previousTotal}건 · 최근 ${span(summary.recentYears)} ${summary.recentTotal}건`
+      + (byShare ? ' · 비중으로 비교' : '')
+      + (r ? ` · ${r.keyword}: ${r.previous}건${byShare ? share(r.previous, summary.previousTotal) : ''} → ${r.recent}건${byShare ? share(r.recent, summary.recentTotal) : ''} (${List.pct(r.growth)}, ${r.trend})` : '');
   }
 
   function renderRecords() {
     $('records-title').textContent = state.selected ? `자료 목록 · ${state.selected}` : '자료 목록';
     List.renderRecords($('records'), state.records, state.selected, {
-      groupColumn: RULES.columns.group, groupLabel: '분야', linkColumn: RULES.columns.link
+      groupColumn: RULES.columns.group, groupLabel: '자료', linkColumn: RULES.columns.link
     });
   }
 
@@ -214,17 +248,54 @@
     renderRecords();
   }
 
+  function renderFilter() {
+    const f = state.filtered;
+    const box = $('filter');
+    box.textContent = '';
+    const p = document.createElement('p');
+    p.className = 'list-count';
+    p.textContent = `${f.kept.length + f.dropped.length}건 중 남김 ${f.kept.length} · 뺌 ${f.dropped.length}`;
+    box.append(p);
+    const list = (title, counts) => {
+      const h = document.createElement('p'); h.className = 'hint'; h.textContent = title;
+      const ul = document.createElement('ul'); ul.className = 'filter-list';
+      Object.entries(counts).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => {
+        const li = document.createElement('li');
+        const a = document.createElement('span'); a.textContent = k;
+        const b = document.createElement('span'); b.className = 'num'; b.textContent = v + '건';
+        li.append(a, b); ul.append(li);
+      });
+      box.append(h, ul);
+    };
+    list('남긴 이유', f.keptBy);
+    list('뺀 이유', f.droppedBy);
+    const det = document.createElement('details');
+    const sum = document.createElement('summary'); sum.textContent = `뺀 자료 ${f.dropped.length}건 보기`;
+    const ol = document.createElement('ol'); ol.className = 'dropped';
+    f.dropped.slice().sort((a, b) => b.rec.year - a.rec.year).forEach(d => {
+      const li = document.createElement('li');
+      const sm = document.createElement('small'); sm.textContent = ` · ${d.reason}`;
+      li.append(`${d.rec.year} ${d.rec[RULES.columns.group] || ''} · ${d.rec.title}`, sm);
+      ol.append(li);
+    });
+    det.append(sum, ol);
+    box.append(det);
+  }
+
   function renderRules() {
     const t = RULES.trend;
     const items = [
       ['키워드 출처', `${RULES.columns.keywords} 칸 (비면 제목 낱말)`],
+      ['거르기', RULES.filter ? `제외 ${RULES.filter.exclude.length}개 · 포함 ${RULES.filter.include.length}개 규칙` : '없음'],
       ['판정 구간', `마지막 연도 기준 최근 ${t.window}년 vs 이전 ${t.window}년`],
+      ['비교 단위', t.basis === 'share' ? '그해 자료 중 비중(%)' : '건수'],
       ['상승 · 하락', `+${Math.round(t.rise * 100)}% 이상 · ${Math.round(t.fall * 100)}% 이하`],
       ['판정 보류', `두 구간 합 ${t.minCount}건 미만`],
       ['신규', '이전 구간 0건'],
       ['불용어', `${RULES.stopwords.length}개`],
       ['동의어', `${Object.keys(RULES.synonyms).length}쌍`],
-      ['막대 색', `${RULES.columns.group} 칸`]
+      ['띄어쓰기', RULES.ignoreSpaces ? '무시하고 같은 낱말로' : '구분'],
+      ['막대 색 · 비교', `${RULES.columns.group} 칸`]
     ];
     const dl = document.createElement('dl');
     items.forEach(([k, v]) => {
@@ -253,12 +324,12 @@
   });
   $('load-sample').addEventListener('click', async () => {
     try {
-      const res = await fetch('data/sample.csv');
+      const res = await fetch(RULES.sampleFile || 'data/sample.csv');
       if (!res.ok) throw new Error(res.status);
       $('input').value = await res.text();
       analyze();
     } catch (err) {
-      setStatus('예시를 불러오지 못했습니다. 파일을 더블클릭해 열었다면 브라우저가 막은 것입니다 → "파일 선택"으로 data/sample.csv를 고르거나 배포 주소에서 여세요.', true);
+      setStatus('예시를 불러오지 못했습니다. 파일을 더블클릭해 열었다면 브라우저가 막은 것입니다 → "파일 선택"으로 예시 파일(data 폴더)을 고르거나 배포 주소에서 여세요.', true);
     }
   });
 
